@@ -1,0 +1,313 @@
+# ============================================================
+# Professional Video Processing and Analysis Pipeline
+# Sports Computer Vision Video Preprocessing Configuration
+# ============================================================
+
+pipeline:
+  # Extract embedded/container metadata, codec information, FPS,
+  # resolution, duration, frame count, timestamp information,
+  # file-health status, and camera/GPS metadata if available.
+  run_metadata_extraction: true
+
+  # Decode the video, sample frames, resize, convert colour spaces,
+  # compute quality scores, detect scene/shot boundaries, save frames,
+  # create processed videos, previews, reports, and manifests.
+  run_preprocessing: true
+
+  # Validate output folders, manifest fields, frame paths, processed videos,
+  # preview videos, and analysis files.
+  run_validation: true
+
+  # If metadata extraction fails, skip preprocessing for that video.
+  # Recommended true for strict clean processing.
+  skip_preprocessing_if_metadata_fails: true
+
+  # For folder input, continue processing the remaining videos if one fails.
+  continue_on_error: true
+
+
+input:
+  # You may provide:
+  #
+  #   1. A single local video file:
+  #      "data/sample_video.mp4"
+  #
+  #   2. A folder containing videos:
+  #      "data/videos"
+  #
+  #   3. A local HLS playlist:
+  #      "data/hls/playlist.m3u8"
+  #
+  #   4. A remote HLS / HTTP / RTSP / RTMP stream:
+  #      "https://example.com/playlist.m3u8"
+  #      "rtsp://camera-ip/stream"
+  #      "rtmp://server/live/stream"
+  #
+  # You can override this from command line using --input.
+  source_path: "C:\\Users\\ASUS\\Downloads\\tu_d\\Basketball\\side\\val-20260508T191547Z-3-001\\val\\videos\\Q4_side_450-480.mp4"
+
+  # Used only when source_path is a folder.
+  recursive: false
+
+  # Supported local video file extensions and URL path extensions.
+  supported_extensions:
+    - ".mp4"
+    - ".mkv"
+    - ".avi"
+    - ".mov"
+    - ".webm"
+    - ".m4v"
+    - ".mts"
+    - ".m2ts"
+    - ".mpeg"
+    - ".mpg"
+    - ".m3u8"
+
+  # Supported streaming protocols.
+  # Actual success depends on your FFmpeg/OpenCV build and network access.
+  stream_prefixes:
+    - "http://"
+    - "https://"
+    - "rtsp://"
+    - "rtmp://"
+
+  # If true, accept HTTP/HTTPS URLs even when the URL has no visible extension.
+  # Useful for signed URLs and streaming endpoints.
+  allow_unknown_url_extension: true
+
+
+output:
+  # Root output directory.
+  # The pipeline will create:
+  #
+  # output_dir/
+  #   Q4_side_450-480/
+  #     embedded_metadata/
+  #     frames/
+  #     manifests/
+  #     processed_videos/
+  #     previews/
+  #     analysis/
+  #     logs/
+  #
+  # You can override this from command line using --output.
+  output_dir: "C:\\Users\\ASUS\\Downloads\\tu_d\\Final_Code\\outputs\\Basketball"
+
+  # Image format for extracted frames.
+  image_format: "jpg"
+
+  # If false:
+  #   video_id = file stem, e.g., Q4_side_450-480
+  #
+  # If true:
+  #   video_id = file stem + hash, useful when processing folders
+  #   containing duplicate filenames from different subfolders.
+  append_source_hash_to_video_id: false
+
+
+metadata:
+  # ffprobe timeout in seconds.
+  ffprobe_timeout_sec: 300
+
+  # If true, ffprobe performs frame counting.
+  # More accurate, but slower.
+  count_frames_with_ffprobe: true
+
+  # If true, FFmpeg performs a full decode validation.
+  # Slower but better for detecting corrupt/truncated files.
+  # Use true for final dataset generation.
+  validate_decode: false
+
+  # Full decode validation timeout in seconds.
+  decode_timeout_sec: 900
+
+  # If true, local .m3u8 playlists are checked for missing local segment files.
+  validate_local_hls_segments: true
+
+
+sampling:
+  # Two supported modes:
+  #
+  #   target_fps:
+  #     Sample frames at approximately the requested FPS.
+  #     Example: source 30 FPS and target_fps 5 gives sample interval 6.
+  #
+  #   every_n_frames:
+  #     Save every N-th frame.
+  #
+  mode: "target_fps"
+
+  # Used when mode = target_fps.
+  target_fps: 5
+
+  # Used when mode = every_n_frames.
+  every_n_frames: 10
+
+
+transform:
+  # Resolution normalization target.
+  target_width: 640
+  target_height: 360
+
+  # Main exported frame colour space.
+  # OpenCV decodes video frames as BGR.
+  # The pipeline saves RGB frames for downstream computer-vision models.
+  output_color_space: "RGB"
+
+  # Save grayscale frames also.
+  # Useful for quality analysis, debugging, and model variants.
+  save_grayscale_frames: true
+
+
+quality:
+  # Empirical configurable thresholds.
+  # These are not universal constants; calibrate per dataset using quality_report.json.
+  blur_threshold: 80.0
+  brightness_min: 35.0
+  brightness_max: 225.0
+  contrast_min: 10.0
+
+  # Enable or disable individual quality checks.
+  use_blur_check: true
+  use_brightness_check: true
+  use_contrast_check: true
+
+  # If true:
+  #   good frames go to frames/good/
+  #   poor frames go to frames/poor_quality/
+  #
+  # If false:
+  #   poor frames are flagged in the manifest but not saved as images.
+  save_poor_quality_frames: true
+
+  # Saves quality_report.json with min/max/mean/median/percentiles.
+  generate_quality_report: true
+
+
+scene_detection:
+  # Implemented baseline method:
+  #
+  #   hsv_histogram
+  #
+  # Future methods you may implement:
+  #   edge_histogram
+  #   ssim
+  #   perceptual_hash
+  #   pyscenedetect
+  #
+  # Keep hsv_histogram unless you add the corresponding Python implementation.
+  method: "hsv_histogram"
+
+  # Current implementation applies scene detection to resized sampled frames.
+  #
+  # Supported now:
+  #   sampled_frames
+  #
+  # Possible future option:
+  #   all_frames
+  apply_on: "sampled_frames"
+
+  # Threshold mode.
+  #
+  # fixed:
+  #   Uses the threshold below for segmentation.
+  #
+  # adaptive_analysis:
+  #   Uses the fixed threshold for segmentation,
+  #   while also reporting a percentile-based adaptive suggestion.
+  threshold_mode: "fixed"
+
+  # Fixed HSV histogram-difference threshold.
+  # If scene_difference > threshold, a new segment starts.
+  threshold: 0.45
+
+  # Used for adaptive-threshold reporting and plotting.
+  adaptive_percentile: 99
+
+  # Avoid detecting too many scene changes close together.
+  min_scene_gap_sampled_frames: 10
+
+
+processed_videos:
+  # Clean videos without diagnostic text overlays.
+  save_processed_videos: true
+
+  # Output FPS for processed videos.
+  # Usually same as sampling.target_fps.
+  output_fps: 5
+
+  # Creates:
+  #   processed_videos/sampled_resized_5fps.mp4
+  save_sampled_resized_video: true
+
+  # Creates:
+  #   processed_videos/grayscale_5fps.mp4
+  save_grayscale_video: true
+
+  # Creates:
+  #   processed_videos/good_frames_only_5fps.mp4
+  #
+  # This differs from sampled_resized_5fps.mp4 only when poor frames exist.
+  save_good_frames_only_video: true
+
+
+preview:
+  # Preview videos with text overlays.
+  # These are for visual inspection and debugging, not for model input.
+  save_preview_videos: true
+
+  # FPS of generated preview videos.
+  preview_fps: 5
+
+  # 0 means no limit.
+  # Use e.g. 300 to create previews only from the first 300 sampled frames.
+  max_preview_frames: 0
+
+  # Creates:
+  #   previews/resized_sampled_preview.mp4
+  save_resized_sampled_preview: true
+
+  # Creates:
+  #   previews/grayscale_preview.mp4
+  save_grayscale_preview: true
+
+  # Creates:
+  #   previews/side_by_side_transform_preview.mp4
+  save_side_by_side_transform_preview: true
+
+  # Creates:
+  #   previews/quality_overlay_preview.mp4
+  save_quality_overlay_preview: true
+
+
+analysis:
+  # Scene histogram graph:
+  #   Shows histogram-difference curve over time.
+  #   Peaks indicate possible shot/scene boundaries.
+  save_scene_histogram_graph: true
+
+  # CSV file containing scene_difference per sampled frame.
+  save_scene_histogram_csv: true
+
+  # Plot blur, brightness, and contrast scores over time.
+  save_quality_scores_graph: true
+
+
+output_validation:
+  # Validate that the output folder structure exists.
+  validate_output_structure: true
+
+  # Check that every saved RGB/gray path in frames_manifest.jsonl exists.
+  validate_saved_frame_paths: true
+
+  # Check that required metadata fields exist for every frame record.
+  validate_required_manifest_fields: true
+
+  # Check that processed videos, previews, and analysis files exist
+  # when enabled in config.
+  validate_video_and_analysis_outputs: true
+
+
+logging:
+  # Options: DEBUG, INFO, WARNING, ERROR
+  level: "INFO"

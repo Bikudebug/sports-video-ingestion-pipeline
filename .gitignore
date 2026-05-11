@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
+
+# Local/editor files
+.idea/
+.vscode/
+*.log
+
+# Generated video pipeline artefacts
+outputs/*
+!outputs/.gitkeep
+dataset/*
+!dataset/.gitkeep
+
+# Large media files
+*.mp4
+*.mkv
+*.avi
+*.mov
+*.webm
+*.m4v
+*.mts
+*.m2ts
+*.mpeg
+*.mpg
+*.jpg
+*.jpeg
+*.png
