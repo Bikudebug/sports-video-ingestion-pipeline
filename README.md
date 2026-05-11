@@ -2,7 +2,12 @@
 
 This repository implements a configurable video ingestion and preprocessing pipeline for sports computer vision workflows. It accepts local video files, folders of videos, and HLS playlist inputs, then converts them into structured, model-ready outputs such as extracted frames, RGB/grayscale images, metadata reports, frame-quality reports, scene-change reports, preview videos, and validation summaries.
 
-The main purpose of this project is to prepare raw sports video data for downstream computer vision tasks. After preprocessing, the exported RGB frames can be used directly by object detection models such as YOLO.
+The main purpose of this project is to prepare raw sports video data for downstream computer vision tasks. After preprocessing, the exported RGB frames can be used by downstream models such as:
+
+- [Ultralytics YOLO](https://github.com/ultralytics/ultralytics) for object detection
+- [OpenMMLab MMPose](https://github.com/open-mmlab/mmpose) for multi-person human pose estimation
+
+This repository does **not** train a new detection or pose-estimation model. Instead, it prepares sports video frames so that downstream computer vision models can consume them reliably.
 
 ---
 
@@ -28,6 +33,7 @@ Color-space conversion
 Frame-quality analysis
         ├── blur score
         ├── brightness score
+        ├── contrast score
         └── poor-frame flagging
         ↓
 Scene-change / shot-boundary detection
@@ -40,11 +46,12 @@ Manifest and report generation
         ├── scene report
         └── validation report
         ↓
-Downstream computer vision inference
-        └── YOLO object detection on exported RGB frames
+Downstream computer vision tasks
+        ├── YOLO object detection
+        └── MMPose multi-person pose estimation
 ```
 
-This repository does **not** train an object detection model. Instead, it prepares sports video data so that a downstream model can consume the processed frames reliably.
+The pipeline prepares clean and organized frame outputs. YOLO and MMPose are used only as downstream validation examples to show that the processed frames are suitable for practical computer vision tasks.
 
 ---
 
@@ -57,12 +64,15 @@ The pipeline supports:
 - Recursive folder scanning
 - Local HLS playlist input through `.m3u8`
 - Configurable frame extraction
+- Configurable target FPS
 - Resolution normalization
 - BGR to RGB conversion
 - Grayscale frame export
 - Frame-quality scoring
+- Blur, brightness, and contrast analysis
 - Poor-quality frame separation
 - Scene-change / shot-boundary detection
+- Segment-wise frame organization
 - Per-frame manifest generation
 - Per-video metadata extraction
 - Quality report generation
@@ -70,6 +80,7 @@ The pipeline supports:
 - Output validation
 - Preview video generation
 - Downstream YOLO object detection on processed RGB frames
+- Downstream MMPose pose estimation on processed RGB frames
 
 ---
 
@@ -164,9 +175,23 @@ ffmpeg -version
 ffprobe -version
 ```
 
+Optional downstream tools:
+
+```bash
+pip install ultralytics
+```
+
+For MMPose, follow the official installation instructions from the OpenMMLab repository:
+
+```text
+https://github.com/open-mmlab/mmpose
+```
+
+MMPose installation depends on the local CUDA/PyTorch/MMCV environment, so it is kept as an optional downstream dependency rather than a required preprocessing dependency.
+
 ---
 
-## 7. Running the Pipeline
+## 7. Running the Preprocessing Pipeline
 
 ### 7.1 Run with the default configuration
 
@@ -251,6 +276,7 @@ It controls the major preprocessing parameters, including:
 - frame-quality thresholds
 - blur detection threshold
 - brightness threshold
+- contrast threshold
 - scene-change detection threshold
 - preview generation
 - processed-video generation
@@ -296,6 +322,15 @@ outputs/playlist/
 └── analysis/
 ```
 
+Downstream model outputs can be saved separately, for example:
+
+```text
+outputs/yolo/
+outputs/mmpose/
+```
+
+These downstream folders are generated after running object detection or pose estimation.
+
 ---
 
 ## 10. Frame Export
@@ -315,7 +350,7 @@ Poor-quality frames are separated into:
 outputs/playlist/frames/poor_quality/
 ```
 
-This separation makes it easier to use only reliable frames for downstream model inference.
+This separation makes it easier to run downstream inference only on reliable frames.
 
 ---
 
@@ -356,7 +391,7 @@ This file is useful when connecting the preprocessing output to another computer
 outputs/playlist/manifests/quality_report.json
 ```
 
-This stores frame-quality statistics such as blur, brightness, and poor-frame counts.
+This stores frame-quality statistics such as blur, brightness, contrast, and poor-frame counts.
 
 ### Scene report
 
@@ -388,7 +423,16 @@ segment_001/
 segment_002/
 ```
 
-This is useful for sports footage because a video may contain multiple camera views, cuts, replays, or transitions. Segment-level organization allows downstream computer vision models to process temporally coherent frame groups.
+The implemented baseline method is:
+
+```yaml
+scene_detection:
+  method: "hsv_histogram"
+```
+
+The HSV histogram method compares consecutive frames using color-distribution differences. Large differences indicate possible scene or shot boundaries. This is useful for sports footage because a video may contain multiple camera views, cuts, replays, close-ups, crowd shots, or broadcast transitions.
+
+Segment-level organization allows downstream computer vision models to process temporally coherent frame groups.
 
 ---
 
@@ -400,6 +444,7 @@ Typical quality checks include:
 
 - blur detection
 - brightness analysis
+- contrast analysis
 - frame validity checks
 - poor-frame flagging
 
@@ -415,32 +460,49 @@ Poor-quality frames are saved under:
 frames/poor_quality/
 ```
 
+This helps reduce downstream inference on frames that may be visually unreliable.
+
 ---
 
-## 14. Downstream Computer Vision Integration with YOLO
+## 14. Downstream Computer Vision Tasks
 
-The assessment requires that the processed output should be usable by a downstream computer vision model. This project demonstrates that requirement using YOLO object detection.
+The preprocessing pipeline is model-agnostic. Its output can be used by multiple downstream computer vision models.
+
+This project demonstrates two downstream tasks:
+
+```text
+Preprocessed RGB frames
+        ↓
+Downstream CV task
+        ├── YOLOv8n object detection
+        └── MMPose multi-person pose estimation
+```
+
+---
+
+## 15. YOLOv8n Object Detection
+
+The first downstream task is object detection using [Ultralytics YOLO](https://github.com/ultralytics/ultralytics).
 
 The role of YOLO in this repository is:
 
 ```text
 Preprocessed RGB frames from this pipeline
         ↓
-YOLO object detection
+YOLOv8n object detection
         ↓
 Annotated prediction images and detection label files
 ```
-
-The pipeline first prepares clean frame data. YOLO is then applied to the exported RGB frames to verify that the output can be consumed by a standard object detection model.
 
 The demonstration model is:
 
 ```text
 yolov8n.pt
 ```
-This is the lightweight YOLOv8 nano model from [Ultralytics YOLO](https://github.com/ultralytics/ultralytics).
 
-Install YOLO separately:
+This is the lightweight YOLOv8 nano model from Ultralytics.
+
+Install YOLO:
 
 ```bash
 pip install ultralytics
@@ -481,9 +543,72 @@ outputs/yolo/segment_000_detection/
 
 This folder contains annotated prediction images and detection label files.
 
+YOLO label files follow this format:
+
+```text
+class_id x_center y_center width height confidence
+```
+
+For COCO-pretrained YOLO models, common useful labels include:
+
+```text
+0  = person
+32 = sports ball
+```
+
+This makes YOLO useful for verifying whether the preprocessed sports frames are suitable for detecting players and balls.
+
 ---
 
-## 15. Example Complete Workflow
+## 16. MMPose Multi-Person Pose Estimation
+
+The second downstream task is multi-person human pose estimation using [OpenMMLab MMPose](https://github.com/open-mmlab/mmpose).
+
+The role of MMPose in this repository is:
+
+```text
+Preprocessed RGB frames from this pipeline
+        ↓
+Person detection + pose estimation
+        ↓
+Player bounding boxes, keypoints, and skeleton overlays
+```
+
+Pose estimation is useful because object detection only localizes players with bounding boxes, while pose estimation provides body-joint locations. This is important for sports analysis tasks such as:
+
+- player movement analysis
+- running posture analysis
+- action phase understanding
+- biomechanical motion analysis
+- skeleton-based temporal analysis
+- player interaction analysis
+
+MMPose can be applied to the exported RGB frame folders, for example:
+
+```text
+outputs/playlist/frames/good/segment_000/rgb/
+```
+
+A typical MMPose output may include:
+
+```text
+outputs/mmpose/
+├── visualizations/
+├── predictions/
+└── pose_results.json
+```
+
+The exact command depends on the local MMPose installation, selected detector, selected pose-estimation model, and available device. Follow the official MMPose repository for installation and demo usage:
+
+```text
+https://github.com/open-mmlab/mmpose
+```
+
+The important point is that the preprocessing pipeline produces normalized and quality-filtered RGB frames that are directly usable for MMPose-based pose estimation.
+
+---
+
+## 17. Example Complete Workflow
 
 A complete run follows these steps.
 
@@ -554,7 +679,7 @@ outputs/<video_id>/frames/good/segment_000/rgb
 
 ---
 
-### Step 6: Run YOLO object detection
+### Step 6A: Run YOLO object detection
 
 ```bash
 yolo predict \
@@ -569,21 +694,44 @@ yolo predict \
   name="segment_000_detection"
 ```
 
----
-
-### Step 7: Review YOLO results
-
 YOLO outputs are saved in:
 
 ```text
 outputs/yolo/segment_000_detection/
 ```
 
-This confirms that the preprocessing pipeline produces model-ready frame data for downstream computer vision inference.
+---
+
+### Step 6B: Run MMPose pose estimation
+
+Use the same RGB frame segment as input to MMPose:
+
+```text
+outputs/<video_id>/frames/good/segment_000/rgb
+```
+
+The exact command depends on the selected MMPose model and detector configuration. MMPose outputs can be saved under:
+
+```text
+outputs/mmpose/
+```
 
 ---
 
-## 16. Git and Large File Policy
+### Step 7: Review downstream CV results
+
+Possible downstream outputs include:
+
+```text
+outputs/yolo/segment_000_detection/
+outputs/mmpose/
+```
+
+This confirms that the preprocessing pipeline produces model-ready frame data for multiple downstream computer vision tasks.
+
+---
+
+## 18. Git and Large File Policy
 
 Generated outputs should not be committed to Git.
 
@@ -594,6 +742,8 @@ The following types of files should remain local:
 - preview videos
 - HLS `.ts` segments
 - YOLO prediction outputs
+- MMPose prediction outputs
+- pose-estimation visualization videos
 - large input videos
 - temporary analysis files
 
@@ -613,9 +763,9 @@ outputs/
 
 ---
 
-## 17. Summary
+## 19. Summary
 
-This repository provides a complete preprocessing stage for sports computer vision pipelines. It converts raw video or HLS input into structured, validated, frame-level outputs. These outputs are then suitable for downstream computer vision tasks such as YOLO-based object detection.
+This repository provides a complete preprocessing stage for sports computer vision pipelines. It converts raw video or HLS input into structured, validated, frame-level outputs. These outputs are suitable for downstream computer vision tasks such as YOLO-based object detection and MMPose-based human pose estimation.
 
 The main contribution is the video ingestion and preprocessing workflow:
 
@@ -624,9 +774,13 @@ raw sports video
         ↓
 validated and normalized frames
         ↓
+quality-filtered frame outputs
+        ↓
 scene-aware frame organization
         ↓
-quality-filtered model-ready data
+model-ready RGB data
         ↓
-downstream object detection
+downstream computer vision tasks
+        ├── object detection
+        └── pose estimation
 ```
