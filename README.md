@@ -438,8 +438,7 @@ The demonstration model is:
 ```text
 yolov8n.pt
 ```
-
-This is the lightweight YOLOv8 nano model from Ultralytics.
+This is the lightweight YOLOv8 nano model from [Ultralytics YOLO](https://github.com/ultralytics/ultralytics).
 
 Install YOLO separately:
 
