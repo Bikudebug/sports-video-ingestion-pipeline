@@ -1,5 +1,5 @@
 # Sports Video Ingestion and Preprocessing Pipeline
-
+<img src="./docs/unnamed.png" alt="BoxingVI" width="100%">
 This repository implements a configurable video ingestion and preprocessing pipeline for sports computer vision workflows. It accepts local video files, folders of videos, and HLS playlist inputs, then converts them into structured, model-ready outputs such as extracted frames, RGB/grayscale images, metadata reports, frame-quality reports, scene-change reports, preview videos, and validation summaries.
 
 The main purpose of this project is to prepare raw sports video data for downstream computer vision tasks. After preprocessing, the exported RGB frames can be used by downstream models such as:
